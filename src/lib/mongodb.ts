@@ -1,4 +1,4 @@
-import { MongoClient, type Db } from "mongodb";
+import { MongoClient, type Db, type MongoClientOptions } from "mongodb";
 
 const DB_NAME = process.env.MONGODB_DB ?? "unblind";
 
@@ -17,15 +17,21 @@ function getClient(): Promise<MongoClient> {
     );
   }
 
+  // Disable wire-protocol compression. The driver negotiates snappy/zstd
+  // with Atlas by default; both use ArrayBuffer transfers that Node 24
+  // leaves detached, so the next sendCommand on the same connection blows
+  // up with "TypedArray.set on a detached ArrayBuffer".
+  const options: MongoClientOptions = { compressors: [] };
+
   if (process.env.NODE_ENV === "development") {
     if (!global._unblindMongoClient) {
-      global._unblindMongoClient = new MongoClient(uri).connect();
+      global._unblindMongoClient = new MongoClient(uri, options).connect();
     }
     return global._unblindMongoClient;
   }
 
   if (!cachedClient) {
-    cachedClient = new MongoClient(uri).connect();
+    cachedClient = new MongoClient(uri, options).connect();
   }
   return cachedClient;
 }

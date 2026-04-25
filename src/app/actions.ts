@@ -1,15 +1,23 @@
 "use server";
 
-import { Binary } from "mongodb";
+import { writeFile, rm } from "node:fs/promises";
+import path from "node:path";
+import { ObjectId } from "mongodb";
+import { revalidatePath } from "next/cache";
 import { GoogleGenAI } from "@google/genai";
-import { getDb } from "@/lib/mongodb";
+import {
+  createProblem,
+  deleteProblem as deleteProblemFromDb,
+  uploadDir,
+  type Message,
+} from "@/lib/problems";
 
-const SUPPORTED_MIME_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/gif",
-]);
+const SUPPORTED_MIME_TYPES: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
 
 const OCR_SYSTEM_PROMPT =
   "You transcribe math problem statements from images. " +
@@ -27,13 +35,13 @@ const RESPOND_SYSTEM_PROMPT =
 
 const DEFAULT_MODEL = "gemini-2.5-flash";
 
-export type ExtractResult =
-  | { ok: true; problem: string; response: string }
+export type SubmitResult =
+  | { ok: true; id: string }
   | { ok: false; error: string };
 
-export async function extractAndRespond(
+export async function submitProblem(
   formData: FormData,
-): Promise<ExtractResult> {
+): Promise<SubmitResult> {
   const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
   if (!apiKey) {
     return {
@@ -47,36 +55,21 @@ export async function extractAndRespond(
   if (!(file instanceof File) || file.size === 0) {
     return { ok: false, error: "No image was provided." };
   }
-  if (!SUPPORTED_MIME_TYPES.has(file.type)) {
+  const ext = SUPPORTED_MIME_TYPES[file.type];
+  if (!ext) {
+    const supported = Object.keys(SUPPORTED_MIME_TYPES).join(", ");
     return {
       ok: false,
-      error: `Unsupported image type: ${file.type || "unknown"}. Supported: png, jpeg, webp, gif.`,
+      error: `Unsupported image type: ${file.type || "unknown"}. Supported: ${supported}.`,
     };
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());
-
-  try {
-    const db = await getDb();
-    await db.collection("uploads").insertOne({
-      filename: file.name,
-      mimeType: file.type,
-      size: file.size,
-      data: new Binary(bytes),
-      uploadedAt: new Date(),
-    });
-  } catch (err) {
-    return {
-      ok: false,
-      error: `Failed to save upload to MongoDB: ${err instanceof Error ? err.message : String(err)}`,
-    };
-  }
-
   const base64 = bytes.toString("base64");
   const model = process.env.UNBLIND_MODEL ?? DEFAULT_MODEL;
   const ai = new GoogleGenAI({ apiKey });
 
-  let problem: string;
+  let statement: string;
   try {
     const ocr = await ai.models.generateContent({
       model,
@@ -90,14 +83,14 @@ export async function extractAndRespond(
         thinkingConfig: { thinkingBudget: 0 },
       },
     });
-    problem = (ocr.text ?? "").trim();
+    statement = (ocr.text ?? "").trim();
   } catch (err) {
     return {
       ok: false,
       error: `OCR call failed: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
-  if (!problem) {
+  if (!statement) {
     return { ok: false, error: "OCR step returned no text." };
   }
 
@@ -105,7 +98,7 @@ export async function extractAndRespond(
   try {
     const reply = await ai.models.generateContent({
       model,
-      contents: [{ text: problem }],
+      contents: [{ text: statement }],
       config: {
         systemInstruction: RESPOND_SYSTEM_PROMPT,
         maxOutputTokens: 4096,
@@ -122,5 +115,81 @@ export async function extractAndRespond(
     return { ok: false, error: "Responder step returned no text." };
   }
 
-  return { ok: true, problem, response };
+  const id = new ObjectId();
+  const relativePath = path.posix.join(
+    "data",
+    "uploads",
+    `${id.toHexString()}.${ext}`,
+  );
+  const absolutePath = path.join(await uploadDir(), `${id.toHexString()}.${ext}`);
+
+  try {
+    await writeFile(absolutePath, bytes);
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Failed to write upload to disk: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  const now = new Date();
+  const messages: Message[] = [
+    {
+      role: "user",
+      type: "file",
+      filename: file.name,
+      mimeType: file.type,
+      size: file.size,
+      path: relativePath,
+      createdAt: now,
+    },
+    {
+      role: "assistant",
+      type: "text",
+      content: statement,
+      model,
+      kind: "extraction",
+      createdAt: now,
+    },
+    {
+      role: "assistant",
+      type: "text",
+      content: response,
+      model,
+      kind: "response",
+      createdAt: now,
+    },
+  ];
+
+  try {
+    await createProblem(id, file.name, messages);
+  } catch (err) {
+    // Clean up the orphan file so we don't leak disk space on a failed insert.
+    await rm(absolutePath, { force: true });
+    return {
+      ok: false,
+      error: `Failed to save problem: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  revalidatePath("/", "layout");
+  return { ok: true, id: id.toHexString() };
+}
+
+export async function deleteProblemAction(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const deleted = await deleteProblemFromDb(id);
+    if (!deleted) {
+      return { ok: false, error: "Problem not found." };
+    }
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Failed to delete problem: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  revalidatePath("/", "layout");
+  return { ok: true };
 }
