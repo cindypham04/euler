@@ -8,6 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Markdown } from "@/components/markdown";
 import type { TextMessage } from "@/lib/problems";
 
 type ChatProps = {
@@ -93,9 +94,7 @@ function MessageCard({ message }: { message: TextMessage }) {
         <CardTitle className="capitalize">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <pre className="whitespace-pre-wrap font-mono text-sm">
-          {message.content}
-        </pre>
+        <Markdown>{message.content}</Markdown>
       </CardContent>
     </Card>
   );
