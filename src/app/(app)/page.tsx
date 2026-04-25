@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { submitProblem } from "./actions";
+import { submitProblem } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import {
   Card,

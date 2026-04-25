@@ -7,6 +7,7 @@ Built with Next.js 16 (App Router), TypeScript, Tailwind CSS v4, shadcn/ui, Mong
 ## Features
 
 - **Image → transcribed problem + first response** in one server action (Gemini 2.5 Flash, OCR pass with thinking disabled, then a separate responder pass)
+- **Phone-camera capture** — `npm run dev:phone` opens an HTTPS tunnel; visit `/capture` on the laptop to see a QR, scan it with your phone, point at a problem, tap once, and the result page opens automatically
 - **Per-problem chat** — keep asking follow-ups on each problem page; the agent has full conversation memory within that problem
 - **Strict cross-problem isolation** — the agent only ever reads/writes the current problem document; messages from other problems are structurally unreachable
 - **Agentic RAG** — the agent decides per-turn whether to call `searchTextbook` (Atlas Vector Search over a CC-BY-licensed OpenStax textbook). Concept questions trigger retrieval; arithmetic and chit-chat skip it.
@@ -94,6 +95,18 @@ Open <http://localhost:3000>, upload an image (`.png`, `.jpg`, `.jpeg`, `.webp`,
 - **"What's 2+2?"** — the agent answers from its own knowledge; no tool call.
 - Open the **"Show retrieval trace"** `<details>` under any assistant turn to see exactly what the tool returned.
 
+## Capture from your phone
+
+```bash
+npm run dev:phone
+```
+
+This starts the dev server **and** opens a public HTTPS tunnel via [Cloudflare Quick Tunnels](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/) using the [`cloudflared`](https://www.npmjs.com/package/cloudflared) npm package — no signup, no auth, no interstitial, works on iOS Safari. Then open <http://localhost:3000/capture> in your laptop browser: you'll see a QR code. Scan it with your phone (Camera app, not Safari directly), allow camera access on the page that opens, point at a math problem, tap **Capture**. The result page opens automatically with the chat.
+
+The `cloudflared` package downloads the cloudflared binary on `npm install`. The tunnel only stays alive while `npm run dev:phone` is running; the URL stays stable for the entire session and changes each time you restart the script.
+
+If you'd rather skip the tunnel and use the camera page directly on the laptop (Chrome/Edge allow `getUserMedia` over `localhost`), just `npm run dev` and visit `/capture` normally.
+
 ## How it works
 
 ### Upload flow ([`src/app/actions.ts`](src/app/actions.ts))
@@ -128,6 +141,7 @@ Open <http://localhost:3000>, upload an image (`.png`, `.jpg`, `.jpeg`, `.webp`,
 | Command | Purpose |
 | --- | --- |
 | `npm run dev` | Start the dev server (Turbopack) |
+| `npm run dev:phone` | Dev server + public HTTPS tunnel for `/capture` (QR-code flow) |
 | `npm run build` | Production build |
 | `npm run start` | Serve the production build |
 | `npm run lint` | Run ESLint |
@@ -139,21 +153,32 @@ Open <http://localhost:3000>, upload an image (`.png`, `.jpg`, `.jpeg`, `.webp`,
 ```
 src/
   app/
+    layout.tsx                          Root layout (html shell, fonts, providers)
     actions.ts                          Upload server action (OCR + first response)
-    page.tsx                            Upload page
-    problems/[id]/
-      page.tsx                          Problem detail page (server-rendered)
-      chat.tsx                          Client-side chat UI with retrieval traces
-      delete-problem-button.tsx
-    api/problems/[id]/
-      file/route.ts                     Serves the uploaded image
-      chat/route.ts                     POST endpoint that runs the agent
+    (app)/                              Route group for sidebar-wrapped pages
+      layout.tsx                        Sidebar + header chrome
+      page.tsx                          Upload page
+      problems/[id]/
+        page.tsx                        Problem detail page (server-rendered)
+        chat.tsx                        Client-side chat UI with retrieval traces
+        delete-problem-button.tsx
+    capture/
+      page.tsx                          Server component — QR (on laptop) or React camera fallback
+      capture-client.tsx                React camera UI used when UNBLIND_PUBLIC_URL is unset
+    api/
+      solve/route.ts                    POST handler used by public/cam.html
+      problems/[id]/
+        file/route.ts                   Serves the uploaded image
+        chat/route.ts                   POST endpoint that runs the agent
   lib/
     mongodb.ts                          Cached client + getDb()
     problems.ts                         Problem CRUD (createProblem, getProblem, appendMessages, …)
     rag.ts                              searchTextbook + embedText
     agent.ts                            runAgent loop, tool wiring, persistence
+public/
+  cam.html                              Static phone-camera page (vanilla JS, no React)
 scripts/
+  dev-phone.ts                          npm run dev:phone — dev server + Cloudflare tunnel + QR
   ingest-textbook.ts                    PDF → chunks → embeddings → MongoDB
   voice-agent.ts                        Standalone CLI voice agent (separate from the web app)
 ```

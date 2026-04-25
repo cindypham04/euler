@@ -13,6 +13,7 @@
   "files": [
     "node-record-lpcm16.d.ts",
     "voice-agent.ts",
-    "ingest-textbook.ts"
+    "ingest-textbook.ts",
+    "dev-phone.ts"
   ]
 }

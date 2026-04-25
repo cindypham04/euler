@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:phone": "ts-node --project scripts/tsconfig.json scripts/dev-phone.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -23,6 +24,7 @@
     "next": "16.2.4",
     "node-record-lpcm16": "^1.0.1",
     "ollama": "^0.5.0",
+    "qrcode": "^1.5.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "shadcn": "^4.5.0",
@@ -33,12 +35,16 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/qrcode": "^1.5.6",
+    "@types/qrcode-terminal": "^0.12.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/wav": "^1.0.0",
+    "cloudflared": "^0.7.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "pdf-parse": "^2.4.5",
+    "qrcode-terminal": "^0.12.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.0",
     "typescript": "^5"
