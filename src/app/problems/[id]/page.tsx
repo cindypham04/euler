@@ -7,6 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { DeleteProblemButton } from "./delete-problem-button";
+import { Chat } from "./chat";
 
 export default async function ProblemPage({
   params,
@@ -50,23 +51,7 @@ export default async function ProblemPage({
         </Card>
       )}
 
-      {textMessages.map(
-        (m, i) =>
-          m.type === "text" && (
-            <Card key={i}>
-              <CardHeader>
-                <CardTitle className="capitalize">
-                  {m.kind ?? m.role}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <pre className="whitespace-pre-wrap font-mono text-sm">
-                  {m.content}
-                </pre>
-              </CardContent>
-            </Card>
-          ),
-      )}
+      <Chat problemId={id} initialMessages={textMessages} />
     </main>
   );
 }

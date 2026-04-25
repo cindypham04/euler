@@ -43,6 +43,9 @@ yarn-error.log*
 # uploaded files
 data/uploads/
 
+# textbook PDFs (too large for git; downloaded by the user before `npm run ingest`)
+*.pdf
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

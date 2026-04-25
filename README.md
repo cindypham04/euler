@@ -1,14 +1,24 @@
 # unblind
 
-Upload an image of a math problem (text + equations), get the problem statement transcribed and a model-generated response — all from one page.
+Upload an image of a math problem, get a tutor that explains the answer and can keep talking — with retrieval-augmented grounding from a real math textbook.
 
-Built with Next.js 16 (App Router), TypeScript, Tailwind CSS v4, shadcn/ui, and the [Google GenAI SDK](https://www.npmjs.com/package/@google/genai). Gemini 2.5 Flash runs both the OCR pass and the responder pass via a single Server Action — the API key never leaves the server.
+Built with Next.js 16 (App Router), TypeScript, Tailwind CSS v4, shadcn/ui, MongoDB Atlas (vector search), and the [Google GenAI SDK](https://www.npmjs.com/package/@google/genai). Gemini 2.5 Flash drives the OCR pass, the responder pass, and the chat agent loop. The agent has one tool — `searchTextbook` — that runs Atlas `$vectorSearch` over an OpenStax textbook and decides on its own when to use it.
+
+## Features
+
+- **Image → transcribed problem + first response** in one server action (Gemini 2.5 Flash, OCR pass with thinking disabled, then a separate responder pass)
+- **Per-problem chat** — keep asking follow-ups on each problem page; the agent has full conversation memory within that problem
+- **Strict cross-problem isolation** — the agent only ever reads/writes the current problem document; messages from other problems are structurally unreachable
+- **Agentic RAG** — the agent decides per-turn whether to call `searchTextbook` (Atlas Vector Search over a CC-BY-licensed OpenStax textbook). Concept questions trigger retrieval; arithmetic and chit-chat skip it.
+- **Retrieval traces** — every tool call and result is persisted as a debug message and rendered in a collapsible "Show retrieval trace" `<details>` so you can see exactly what the model looked up
+- **Persistent history sidebar** — every problem you've worked on, listed for one-click resume
+- **Multi-key ingestion** — optional comma-separated key pool rotates around per-key Gemini rate limits when embedding the textbook
 
 ## Prerequisites
 
 - **Node.js 20+** and **npm**
-- A free **Gemini API key** from [Google AI Studio](https://aistudio.google.com/app/apikey) (the free tier covers 1,500 requests/day)
-- A free **MongoDB Atlas** cluster (the M0 tier gives you 512 MB at no cost)
+- A free **Gemini API key** from [Google AI Studio](https://aistudio.google.com/app/apikey)
+- A free **MongoDB Atlas** cluster (M0 — 512 MB at no cost; vector search is included on the free tier)
 
 ## Setup
 
@@ -35,11 +45,42 @@ MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>/?retryWrites=true&w=majori
 MONGODB_DB=unblind
 ```
 
-Optional model override (defaults to `gemini-2.5-flash`):
+Optional:
 
 ```
+# Override the LLM model (defaults to gemini-2.5-flash)
 UNBLIND_MODEL=gemini-2.5-flash
+
+# Override the textbook source id used for RAG queries (defaults to
+# openstax-algebra-trig-2e). Useful only if you ingest a different textbook.
+UNBLIND_TEXTBOOK_SOURCE=openstax-algebra-trig-2e
+
+# Comma-separated pool of Gemini API keys used by the ingest script ONLY,
+# to rotate around per-key rate limits. Falls back to GEMINI_API_KEY.
+GEMINI_API_KEYS=key1,key2,key3
 ```
+
+## Ingest the textbook
+
+The agent's `searchTextbook` tool queries an OpenStax math textbook stored in MongoDB. **Algebra and Trigonometry 2e** is the recommended default — broadest school-math coverage and CC-BY 4.0 licensed.
+
+1. Download the PDF from <https://openstax.org/details/books/algebra-and-trigonometry-2e>. Save it to the project root (the file is ignored by git, so the filename can be anything; the default OpenStax filename is `algebra-and-trigonometry-2e_-_WEB.pdf`).
+2. Run:
+   ```bash
+   npm run ingest -- ./algebra-and-trigonometry-2e_-_WEB.pdf
+   ```
+
+What the script does:
+- Extracts text per page (`pdf-parse` v2)
+- Detects chapters / sections
+- Splits into ~1,200-character chunks with 200-char overlap (~2,000–2,500 chunks for Algebra & Trig 2e)
+- Embeds via Gemini `gemini-embedding-001` at 768 dimensions (Matryoshka truncation via `outputDimensionality`)
+- Upserts into the `textbook_chunks` collection (idempotent — re-runs skip already-embedded chunks)
+- Ensures the Atlas Vector Search index `textbook_chunks_vector` exists
+
+Free-tier rate limits cap embeddings at ~100 inputs/minute per API key. Set `GEMINI_API_KEYS` to a comma-separated list of multiple free keys to rotate through them; the script will instantly swap on a 429 and only sleep when every key in the pool is exhausted.
+
+After ingestion, confirm in the Atlas UI → Search Indexes that `textbook_chunks_vector` shows status **Active** (build takes 1–3 minutes).
 
 ## Run
 
@@ -47,25 +88,72 @@ UNBLIND_MODEL=gemini-2.5-flash
 npm run dev
 ```
 
-Open <http://localhost:3000>, pick an image (`.png`, `.jpg`, `.jpeg`, `.webp`, or `.gif` up to 10 MB), and click **Submit**. The first card shows the transcribed problem statement (with `$...$` LaTeX for inline math), the second shows the model's response.
+Open <http://localhost:3000>, upload an image (`.png`, `.jpg`, `.jpeg`, `.webp`, or `.gif` up to 10 MB). After the first OCR + response, you can keep chatting on the problem page. Try:
 
-A sample worksheet lives at `data/image.png` if you want something to try.
+- **"Explain the quadratic formula"** — the agent calls `searchTextbook`, retrieves passages, and cites a section + page number in the answer.
+- **"What's 2+2?"** — the agent answers from its own knowledge; no tool call.
+- Open the **"Show retrieval trace"** `<details>` under any assistant turn to see exactly what the tool returned.
 
 ## How it works
 
-1. The browser sends the image bytes to a Next.js Server Action ([`src/app/actions.ts`](src/app/actions.ts)).
-2. **Persist:** the file is saved as a BSON document in the `uploads` collection (`filename`, `mimeType`, `size`, raw `data`, `uploadedAt`). Done before any model call so a Gemini failure never loses the upload.
-3. **OCR pass:** Gemini 2.5 Flash transcribes the problem statement. Thinking is disabled (`thinkingBudget: 0`) — transcription doesn't need reasoning, and skipping it cuts latency.
-4. **Responder pass:** The transcribed text is sent back to Gemini 2.5 Flash with default thinking enabled, asking for a response to the problem(s).
-5. Both results are returned to the page and rendered in two cards.
+### Upload flow ([`src/app/actions.ts`](src/app/actions.ts))
+1. Server action receives the image bytes.
+2. Gemini OCR pass transcribes the problem statement (thinking disabled — transcription doesn't need reasoning).
+3. Gemini responder pass produces an initial answer.
+4. Image bytes saved to `data/uploads/{id}.{ext}`; the problem document (with three seed messages — file, extraction, response) goes to MongoDB.
 
-Each submit consumes two requests against your Gemini quota and writes one document to MongoDB.
+### Chat flow ([`src/lib/agent.ts`](src/lib/agent.ts))
+1. The chat UI POSTs to `/api/problems/{id}/chat` with the user's message.
+2. `runAgent` loads the problem (the **only** DB read for context — this is what enforces per-problem isolation), builds a Gemini `Content[]` from the conversation history, and runs a function-calling loop.
+3. Each turn, the model can either emit a final text answer or call `searchTextbook(query, k)`. The system prompt tells it to call the tool only for textbook-style concept questions (definitions, theorems, formulas, worked examples) and skip it for arithmetic and chit-chat.
+4. Loop terminates when the model emits a turn with no function calls. Capped at 4 rounds; if the cap fires, one final call with `tools: []` forces a text reply.
+5. New messages — the user turn, every tool-call/tool-result trace, and the final assistant turn — are appended to the problem in one update via `appendMessages(id, msgs)`.
+
+### RAG retrieval ([`src/lib/rag.ts`](src/lib/rag.ts))
+- Embedding: Gemini `gemini-embedding-001` at 768 dimensions (`outputDimensionality` truncation).
+- Aggregation:
+  ```js
+  { $vectorSearch: {
+      index: "textbook_chunks_vector",
+      path: "embedding",
+      queryVector,
+      numCandidates: 150,
+      limit: 4,
+      filter: { source: TEXTBOOK_SOURCE },
+  }}
+  ```
 
 ## Scripts
 
-| Command          | Purpose                       |
-| ---------------- | ----------------------------- |
-| `npm run dev`    | Start the dev server (Turbopack) |
-| `npm run build`  | Production build              |
-| `npm run start`  | Serve the production build    |
-| `npm run lint`   | Run ESLint                    |
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the dev server (Turbopack) |
+| `npm run build` | Production build |
+| `npm run start` | Serve the production build |
+| `npm run lint` | Run ESLint |
+| `npm run ingest -- <pdf>` | Embed a textbook PDF into MongoDB Atlas |
+| `npm run voice` | Standalone voice-agent CLI (Ollama + ElevenLabs + Google Speech) — separate from the web app |
+
+## Project structure
+
+```
+src/
+  app/
+    actions.ts                          Upload server action (OCR + first response)
+    page.tsx                            Upload page
+    problems/[id]/
+      page.tsx                          Problem detail page (server-rendered)
+      chat.tsx                          Client-side chat UI with retrieval traces
+      delete-problem-button.tsx
+    api/problems/[id]/
+      file/route.ts                     Serves the uploaded image
+      chat/route.ts                     POST endpoint that runs the agent
+  lib/
+    mongodb.ts                          Cached client + getDb()
+    problems.ts                         Problem CRUD (createProblem, getProblem, appendMessages, …)
+    rag.ts                              searchTextbook + embedText
+    agent.ts                            runAgent loop, tool wiring, persistence
+scripts/
+  ingest-textbook.ts                    PDF → chunks → embeddings → MongoDB
+  voice-agent.ts                        Standalone CLI voice agent (separate from the web app)
+```

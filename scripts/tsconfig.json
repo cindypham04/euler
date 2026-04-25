@@ -12,6 +12,7 @@
   },
   "files": [
     "node-record-lpcm16.d.ts",
-    "voice-agent.ts"
+    "voice-agent.ts",
+    "ingest-textbook.ts"
   ]
 }

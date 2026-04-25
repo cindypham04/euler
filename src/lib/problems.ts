@@ -105,6 +105,23 @@ export async function deleteProblem(id: string): Promise<boolean> {
   return result.deletedCount === 1;
 }
 
+export async function appendMessages(
+  id: string,
+  messages: Message[],
+): Promise<boolean> {
+  if (!ObjectId.isValid(id)) return false;
+  if (messages.length === 0) return true;
+  const col = await collection();
+  const result = await col.updateOne(
+    { _id: new ObjectId(id) },
+    {
+      $push: { messages: { $each: messages } },
+      $set: { updatedAt: new Date() },
+    },
+  );
+  return result.matchedCount === 1;
+}
+
 export async function getFirstFileMessage(
   id: string,
 ): Promise<FileMessage | null> {
