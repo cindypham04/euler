@@ -6,11 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "voice": "ts-node --project scripts/tsconfig.json scripts/voice-agent.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
+    "@google-cloud/speech": "^6.0.0",
     "@google/genai": "^1.50.1",
+    "dotenv": "^16.0.0",
+    "elevenlabs": "^1.0.0",
+    "node-record-lpcm16": "^1.0.1",
+    "ollama": "^0.5.0",
+    "wav": "^1.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.11.0",
@@ -27,6 +34,8 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/wav": "^1.0.0",
+    "ts-node": "^10.9.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",
