@@ -10,7 +10,7 @@ function isLocalHost(host: string): boolean {
 export default async function CapturePage() {
   const hdrs = await headers();
   const host = hdrs.get("host") ?? "";
-  const publicUrl = process.env.UNBLIND_PUBLIC_URL?.replace(/\/$/, "");
+  const publicUrl = process.env.EULER_PUBLIC_URL?.replace(/\/$/, "");
 
   if (publicUrl && isLocalHost(host)) {
     const captureUrl = `${publicUrl}/cam.html`;

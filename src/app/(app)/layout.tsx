@@ -21,10 +21,10 @@ export default function AppLayout({
               className="font-display text-xl italic"
               style={{ letterSpacing: "-0.01em" }}
             >
-              unblind
+              euler
             </span>
             <span className="hidden text-[0.7rem] italic text-muted-foreground sm:inline">
-              · a reader for math problems
+              · unblind the genius math in you
             </span>
           </div>
           <div className="ml-auto editorial-label">No. 01</div>

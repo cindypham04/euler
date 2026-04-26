@@ -1,4 +1,6 @@
-# unblind
+# euler
+
+> unblind the genius math in you.
 
 Upload an image of a math problem, get a tutor that explains the answer and can keep talking — with retrieval-augmented grounding from a real math textbook.
 
@@ -50,11 +52,11 @@ Optional:
 
 ```
 # Override the LLM model (defaults to gemini-2.5-flash)
-UNBLIND_MODEL=gemini-2.5-flash
+EULER_MODEL=gemini-2.5-flash
 
 # Override the textbook source id used for RAG queries (defaults to
 # openstax-algebra-trig-2e). Useful only if you ingest a different textbook.
-UNBLIND_TEXTBOOK_SOURCE=openstax-algebra-trig-2e
+EULER_TEXTBOOK_SOURCE=openstax-algebra-trig-2e
 
 # Comma-separated pool of Gemini API keys used by the ingest script ONLY,
 # to rotate around per-key rate limits. Falls back to GEMINI_API_KEY.
@@ -164,7 +166,7 @@ src/
         delete-problem-button.tsx
     capture/
       page.tsx                          Server component — QR (on laptop) or React camera fallback
-      capture-client.tsx                React camera UI used when UNBLIND_PUBLIC_URL is unset
+      capture-client.tsx                React camera UI used when EULER_PUBLIC_URL is unset
     api/
       solve/route.ts                    POST handler used by public/cam.html
       problems/[id]/

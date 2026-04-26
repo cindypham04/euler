@@ -64,7 +64,7 @@ export async function submitProblem(
 
   const bytes = Buffer.from(await file.arrayBuffer());
   const base64 = bytes.toString("base64");
-  const model = process.env.UNBLIND_MODEL ?? DEFAULT_MODEL;
+  const model = process.env.EULER_MODEL ?? DEFAULT_MODEL;
   const ai = new GoogleGenAI({ apiKey });
 
   let statement: string;

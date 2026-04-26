@@ -54,7 +54,7 @@ export default function Home() {
           className="drop-cap mt-6 max-w-xl font-display text-lg leading-relaxed text-foreground/80"
           style={{ fontVariationSettings: "'opsz' 32, 'SOFT' 50" }}
         >
-          Upload a photograph of any math question. unblind will read the
+          Upload a photograph of any math question. euler will read the
           statement, walk you through it, and stay on call for follow-ups.
         </p>
       </section>

@@ -1,7 +1,7 @@
 /**
  * Start the Next dev server and a Cloudflare Quick Tunnel so a phone can hit
  * /capture without firewall, HTTPS-cert, or LAN-IP fuss. The tunnel URL is
- * exposed to Next via UNBLIND_PUBLIC_URL so the /capture page can render a QR
+ * exposed to Next via EULER_PUBLIC_URL so the /capture page can render a QR
  * for it.
  *
  * Usage:
@@ -69,7 +69,7 @@ async function main(): Promise<void> {
     ['next', 'dev', '-p', String(PORT)],
     {
       stdio: 'inherit',
-      env: { ...process.env, UNBLIND_PUBLIC_URL: url },
+      env: { ...process.env, EULER_PUBLIC_URL: url },
       shell: true,
     },
   );

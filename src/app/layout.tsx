@@ -24,9 +24,9 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "unblind — a reader for math problems",
+  title: "euler — unblind the genius math in you",
   description:
-    "Upload a photograph of a math problem. unblind extracts the statement, walks you through it, and answers your follow-ups.",
+    "Upload a photograph of a math problem. euler extracts the statement, walks you through it, and answers your follow-ups.",
 };
 
 export default function RootLayout({

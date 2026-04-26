@@ -4,7 +4,7 @@ const DB_NAME = process.env.MONGODB_DB ?? "unblind";
 
 declare global {
   // eslint-disable-next-line no-var
-  var _unblindMongoClient: Promise<MongoClient> | undefined;
+  var _eulerMongoClient: Promise<MongoClient> | undefined;
 }
 
 let cachedClient: Promise<MongoClient> | null = null;
@@ -24,10 +24,10 @@ function getClient(): Promise<MongoClient> {
   const options: MongoClientOptions = { compressors: [] };
 
   if (process.env.NODE_ENV === "development") {
-    if (!global._unblindMongoClient) {
-      global._unblindMongoClient = new MongoClient(uri, options).connect();
+    if (!global._eulerMongoClient) {
+      global._eulerMongoClient = new MongoClient(uri, options).connect();
     }
-    return global._unblindMongoClient;
+    return global._eulerMongoClient;
   }
 
   if (!cachedClient) {

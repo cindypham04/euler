@@ -8,7 +8,7 @@ export const EMBEDDING_MODEL = "gemini-embedding-001";
 export const EMBEDDING_DIMENSIONS = 768;
 
 export const TEXTBOOK_SOURCE =
-  process.env.UNBLIND_TEXTBOOK_SOURCE ?? "openstax-algebra-trig-2e";
+  process.env.EULER_TEXTBOOK_SOURCE ?? "openstax-algebra-trig-2e";
 
 export type TextbookChunk = {
   _id: ObjectId;

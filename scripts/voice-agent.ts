@@ -1,5 +1,5 @@
 /**
- * Voice interaction loop for unblind.
+ * Voice interaction loop for euler.
  *
  * Flow:
  *   1. Fetch the problem's initial Gemini response from the web app
