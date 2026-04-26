@@ -11,6 +11,7 @@ export function CaptureClient() {
   const streamRef = useRef<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [pending, startTransition] = useTransition();
   const [debug, setDebug] = useState<string[]>([]);
 
@@ -22,11 +23,14 @@ export function CaptureClient() {
 
   async function startCamera(): Promise<void> {
     if (streamRef.current) return;
+    setError(null);
+    setStarting(true);
     log("startCamera: calling getUserMedia");
 
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       log("startCamera: getUserMedia API missing");
       setError("Camera API not available on this browser/device.");
+      setStarting(false);
       return;
     }
 
@@ -42,11 +46,13 @@ export function CaptureClient() {
       const msg = err instanceof Error ? err.message : String(err);
       log(`startCamera: ERROR ${name}: ${msg}`);
       setError(`${name}: ${msg}`);
+      setStarting(false);
       return;
     }
 
     if (streamRef.current) {
       stream.getTracks().forEach((t) => t.stop());
+      setStarting(false);
       return;
     }
     streamRef.current = stream;
@@ -59,15 +65,14 @@ export function CaptureClient() {
       }
     }
     setStreaming(true);
+    setStarting(false);
   }
 
   useEffect(() => {
-    void startCamera();
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleCapture(): void {
@@ -126,8 +131,21 @@ export function CaptureClient() {
         />
         <canvas ref={canvasRef} className="hidden" />
         {!streaming && !error && (
-          <div className="absolute inset-0 flex items-center justify-center font-display text-sm italic text-background/70">
-            Starting camera&hellip;
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center font-display text-sm italic text-background/70">
+            {starting ? (
+              <div>Starting camera&hellip;</div>
+            ) : (
+              <>
+                <div>Tap to allow camera access.</div>
+                <button
+                  type="button"
+                  onClick={() => void startCamera()}
+                  className="min-h-14 min-w-56 rounded-lg border border-border bg-background/90 px-6 py-3 font-display text-sm italic text-foreground transition hover:bg-background/95"
+                >
+                  Start camera
+                </button>
+              </>
+            )}
           </div>
         )}
         {pending && (
@@ -147,7 +165,14 @@ export function CaptureClient() {
 
       {error && (
         <div className="border-l-4 border-l-primary bg-primary/15 px-4 py-2 font-display text-sm italic text-background">
-          {error}
+          <div>{error}</div>
+          <button
+            type="button"
+            onClick={() => void startCamera()}
+            className="mt-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
+          >
+            Retry camera
+          </button>
         </div>
       )}
 
