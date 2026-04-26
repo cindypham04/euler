@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
+import "katex/dist/katex.min.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 const geistSans = Geist({
@@ -24,7 +25,7 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "euler — unblind the genius math in you",
+  title: "euler — a reader for math problems",
   description:
     "Upload a photograph of a math problem. euler extracts the statement, walks you through it, and answers your follow-ups.",
 };

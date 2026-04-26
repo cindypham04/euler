@@ -1,6 +1,6 @@
 import { MongoClient, type Db, type MongoClientOptions } from "mongodb";
 
-const DB_NAME = process.env.MONGODB_DB ?? "unblind";
+const DB_NAME = process.env.MONGODB_DB ?? "euler";
 
 declare global {
   // eslint-disable-next-line no-var

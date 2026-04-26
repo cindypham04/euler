@@ -1,25 +1,22 @@
 /**
- * Voice interaction loop for euler.
+ * Voice interaction loop for euler (TypeScript port).
  *
  * Flow:
- *   1. Fetch the problem's initial Gemini response from the web app
- *   2. Speak it via ElevenLabs TTS (afplay on macOS)
- *   3. Listen for spoken follow-up (silence-detection via node-record-lpcm16 + sox)
- *   4. Transcribe via Google Cloud Speech-to-Text
- *   5. Send to the Gemini agent API on the running Next.js server
- *   6. Repeat from step 2
+ *   1. Speak the LLM explanation via ElevenLabs (afplay on macOS)
+ *   2. Listen for the user's spoken follow-up (silence-detection via node-record-lpcm16 + sox)
+ *   3. Transcribe via Google Cloud Speech-to-Text
+ *   4. Send to local Ollama
+ *   5. Repeat from step 1
  *
- * Usage:
- *   npm run voice <problemId>
- *
- * Prerequisites:
+ * Prerequisites (run once):
  *   brew install sox
- *   ollama serve  (no longer needed — uses Gemini via the web app API)
+ *   npm install elevenlabs ollama dotenv node-record-lpcm16 @google-cloud/speech wav
+ *   npm install -D typescript @types/node @types/node-record-lpcm16 @types/wav ts-node
  *
- * .env.local keys needed:
+ * .env keys needed:
  *   ELEVENLABS_API_KEY=...
+ *   OLLAMA_MODEL=gemma4:e2b
  *   GOOGLE_APPLICATION_CREDENTIALS=path/to/service-account.json
- *   SERVER_URL=http://localhost:3000   (optional, defaults to localhost:3000)
  */
 
 import * as fs from 'fs';
@@ -28,91 +25,54 @@ import * as path from 'path';
 import { spawnSync } from 'child_process';
 import dotenv from 'dotenv';
 import { ElevenLabsClient } from 'elevenlabs';
+import ollama from 'ollama';
 import record from 'node-record-lpcm16';
 import speech from '@google-cloud/speech';
 
+// Next.js uses .env.local; dotenv defaults to .env — try both
 dotenv.config({ path: '.env.local' });
-dotenv.config();
+dotenv.config(); // fills any keys not already set
 
 // ── config ────────────────────────────────────────────────────────────────────
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY ?? '';
-const SERVER_URL         = (process.env.SERVER_URL ?? 'http://localhost:3000').replace(/\/$/, '');
-const PROBLEM_ID         = process.argv[2] ?? process.env.PROBLEM_ID ?? '';
+const OLLAMA_MODEL        = process.env.OLLAMA_MODEL ?? 'gemma4:e2b';
 
-const VOICE_ID  = 'JBFqnCBsd6RMkjVDRZzb'; // ElevenLabs "George"
+const VOICE_ID = 'JBFqnCBsd6RMkjVDRZzb'; // ElevenLabs "George"
 const TTS_MODEL = 'eleven_turbo_v2';
 
-const SAMPLE_RATE         = 16_000;
-const CHUNK_SEC           = 0.3;
-const SILENCE_THRESHOLD   = 600;
-const SILENCE_TIMEOUT_SEC = 2.0;
-const MAX_RECORD_SEC      = 15.0;
+const SAMPLE_RATE          = 16_000;
+const CHUNK_SEC            = 0.3;
+const SILENCE_THRESHOLD    = 600;
+const SILENCE_TIMEOUT_SEC  = 2.0;
+const MAX_RECORD_SEC       = 15.0;
 
-// ── text helpers ──────────────────────────────────────────────────────────────
+const SYSTEM_PROMPT =
+  'You are a helpful math tutor assisting a blind student. ' +
+  'The student just heard a calculus problem read aloud. ' +
+  'Answer their follow-up questions in plain spoken English — ' +
+  'no LaTeX, no symbols, no markdown formatting. ' +
+  'Speak as if explaining to someone who cannot see the board. ' +
+  'Keep answers concise and clear.';
 
-function stripMarkdown(text: string): string {
-  return text
-    .replace(/\$\$[\s\S]*?\$\$/g, ' [display equation] ')
-    .replace(/\$[^$\n]+?\$/g, ' [math] ')
-    .replace(/#{1,6}\s+/g, '')
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/\*(.+?)\*/g, '$1')
-    .replace(/`[^`]+`/g, '')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/\n{2,}/g, '. ')
-    .replace(/\n/g, ' ')
-    .trim();
-}
-
-// ── web app API ───────────────────────────────────────────────────────────────
-
-type ApiMessage = {
-  role: string;
-  type: string;
-  content?: string;
-  kind?: string;
-};
-
-async function fetchInitialResponse(problemId: string): Promise<string> {
-  const res = await fetch(`${SERVER_URL}/api/problems/${problemId}`);
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `HTTP ${res.status}`);
-  }
-  const problem = (await res.json()) as { messages: ApiMessage[] };
-  const response = problem.messages.find(
-    (m) => m.role === 'assistant' && m.type === 'text' && m.kind === 'response',
-  );
-  if (!response?.content) {
-    throw new Error('No initial response found for this problem.');
-  }
-  return response.content;
-}
-
-async function askGemini(problemId: string, question: string): Promise<string> {
-  const res = await fetch(`${SERVER_URL}/api/problems/${problemId}/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: question }),
-  });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `HTTP ${res.status}`);
-  }
-  const body = (await res.json()) as { messages: ApiMessage[] };
-  const reply = [...body.messages].reverse().find(
-    (m) => m.role === 'assistant' && m.kind === 'chat',
-  );
-  return reply?.content ?? '(No response from assistant.)';
-}
+const INITIAL_LLM_OUTPUT =
+  /*'Here is your problem. ' +
+  'Evaluate the limit as x approaches 2 of the quantity x squared minus 4, ' +
+  'divided by x minus 2. ' +
+  'This is a classic indeterminate form. ' +
+  'When we substitute x equals 2 directly, we get 0 divided by 0, which is undefined. ' +
+  'To resolve this, we factor the numerator: x squared minus 4 equals ' +
+  'the product of x plus 2 and x minus 2. ' +
+  'Cancel the x minus 2 terms in numerator and denominator. ' +
+  'We are left with the limit as x approaches 2 of x plus 2, which equals 4. ' +
+  'The answer is 4. ' +*/
+  'Do you have any questions about this problem?';
 
 // ── TTS ───────────────────────────────────────────────────────────────────────
 
 async function speak(text: string, client: ElevenLabsClient): Promise<void> {
-  const clean = stripMarkdown(text);
   const audioStream = await client.textToSpeech.convert(VOICE_ID, {
-    text: clean,
+    text,
     model_id: TTS_MODEL,
     output_format: 'mp3_44100_128',
   });
@@ -148,16 +108,16 @@ function listen(): Promise<string> {
   return new Promise((resolve) => {
     console.log('[Listener] Speak your question now…');
 
-    const chunkBytes          = Math.floor(SAMPLE_RATE * CHUNK_SEC) * 2;
+    const chunkBytes         = Math.floor(SAMPLE_RATE * CHUNK_SEC) * 2; // int16 = 2 bytes/sample
     const silenceChunksNeeded = Math.ceil(SILENCE_TIMEOUT_SEC / CHUNK_SEC);
-    const maxChunks           = Math.ceil(MAX_RECORD_SEC / CHUNK_SEC);
+    const maxChunks          = Math.ceil(MAX_RECORD_SEC / CHUNK_SEC);
 
     const pcmChunks: Buffer[] = [];
-    let silenceCount   = 0;
+    let silenceCount  = 0;
     let speechDetected = false;
-    let chunkCount     = 0;
-    let partial        = Buffer.alloc(0);
-    let finished       = false;
+    let chunkCount    = 0;
+    let partial       = Buffer.alloc(0);
+    let finished      = false;
 
     const rec = record.record({
       sampleRate: SAMPLE_RATE,
@@ -227,24 +187,34 @@ function listen(): Promise<string> {
   });
 }
 
+// ── LLM ───────────────────────────────────────────────────────────────────────
+
+type Message = { role: 'user' | 'assistant' | 'system'; content: string };
+
+async function askLlm(question: string, history: Message[]): Promise<string> {
+  history.push({ role: 'user', content: question });
+  const response = await ollama.chat({
+    model: OLLAMA_MODEL,
+    messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...history],
+  });
+  const answer = response.message.content;
+  history.push({ role: 'assistant', content: answer });
+  return answer;
+}
+
 // ── main loop ─────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
   if (!ELEVENLABS_API_KEY) {
-    console.error('Error: ELEVENLABS_API_KEY not set in .env.local');
-    process.exit(1);
-  }
-  if (!PROBLEM_ID) {
-    console.error('Usage: npm run voice <problemId>');
+    console.error('Error: ELEVENLABS_API_KEY not set in .env');
     process.exit(1);
   }
 
-  console.log(`[Voice] Fetching problem ${PROBLEM_ID} from ${SERVER_URL}…`);
-  const initialResponse = await fetchInitialResponse(PROBLEM_ID);
-  console.log('[Voice] Got initial response. Speaking…');
+  const eleven  = new ElevenLabsClient({ apiKey: ELEVENLABS_API_KEY });
+  const history: Message[] = [{ role: 'assistant', content: INITIAL_LLM_OUTPUT }];
 
-  const eleven = new ElevenLabsClient({ apiKey: ELEVENLABS_API_KEY });
-  await speak(initialResponse, eleven);
+  console.log('[Speaking] Reading problem explanation…');
+  await speak(INITIAL_LLM_OUTPUT, eleven);
 
   while (true) {
     console.log('\n[Listener] Waiting for question… (Ctrl+C to exit)');
@@ -255,16 +225,9 @@ async function main(): Promise<void> {
       continue;
     }
 
-    console.log('[Gemini] Thinking…');
-    let answer: string;
-    try {
-      answer = await askGemini(PROBLEM_ID, question);
-    } catch (err) {
-      console.error('[Gemini error]', err);
-      await speak("Sorry, I had trouble getting a response. Please try again.", eleven);
-      continue;
-    }
-    console.log(`[Gemini] ${answer}`);
+    console.log('[LLM] Thinking…');
+    const answer = await askLlm(question, history);
+    console.log(`[LLM] ${answer}`);
     await speak(answer, eleven);
   }
 }

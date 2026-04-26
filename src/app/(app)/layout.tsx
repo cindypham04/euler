@@ -24,7 +24,7 @@ export default function AppLayout({
               euler
             </span>
             <span className="hidden text-[0.7rem] italic text-muted-foreground sm:inline">
-              · unblind the genius math in you
+              · a reader for math problems
             </span>
           </div>
           <div className="ml-auto editorial-label">No. 01</div>

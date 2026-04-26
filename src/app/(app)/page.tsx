@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Upload } from "lucide-react";
+import Image from "next/image";
 import { submitProblem } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import {
@@ -79,6 +80,22 @@ export default function Home() {
           <p className="mt-2 text-xs text-muted-foreground">
             PNG · JPEG · WEBP · GIF
           </p>
+
+          <div className="mt-6 flex flex-col items-center gap-2">
+            <div className="flex w-full items-center gap-3 text-muted-foreground/50">
+              <div className="h-px flex-1 bg-current" />
+              <span className="text-xs">or scan to capture from phone</span>
+              <div className="h-px flex-1 bg-current" />
+            </div>
+            <Image
+              src="/capture-qr.png"
+              alt="QR code to capture from phone"
+              width={120}
+              height={120}
+              className="mt-2 rounded-md"
+            />
+          </div>
+
           <input
             id="image"
             type="file"
