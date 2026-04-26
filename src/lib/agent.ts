@@ -71,6 +71,32 @@ function ai(): GoogleGenAI {
   return aiSingleton;
 }
 
+function isRateLimitError(err: unknown): boolean {
+  if (err && typeof err === "object" && "status" in err) {
+    return (err as { status: number }).status === 429;
+  }
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes("429") || msg.toLowerCase().includes("rate limit") || msg.toLowerCase().includes("quota");
+}
+
+async function generateWithRetry(
+  ...args: Parameters<GoogleGenAI["models"]["generateContent"]>
+): ReturnType<GoogleGenAI["models"]["generateContent"]> {
+  const delays = [2000, 5000, 10000];
+  for (let i = 0; i <= delays.length; i++) {
+    try {
+      return await ai().models.generateContent(...args);
+    } catch (err) {
+      if (isRateLimitError(err) && i < delays.length) {
+        await new Promise((r) => setTimeout(r, delays[i]));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("unreachable");
+}
+
 function buildContents(messages: Message[]): Content[] {
   const out: Content[] = [];
   for (const msg of messages) {
@@ -118,7 +144,7 @@ export async function runAgent(
   let finalText = "";
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const resp = await ai().models.generateContent({
+    const resp = await generateWithRetry({
       model: AGENT_MODEL,
       contents,
       config: {
@@ -164,7 +190,7 @@ export async function runAgent(
   }
 
   if (!finalText) {
-    const recovery = await ai().models.generateContent({
+    const recovery = await generateWithRetry({
       model: AGENT_MODEL,
       contents,
       config: {
