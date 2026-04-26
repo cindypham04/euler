@@ -22,7 +22,7 @@ export function CaptureClient() {
   }
 
   async function startCamera(): Promise<void> {
-    if (streamRef.current) return;
+    if (streamRef.current || starting) return;
     setError(null);
     setStarting(true);
     log("startCamera: calling getUserMedia");
@@ -133,7 +133,12 @@ export function CaptureClient() {
         {!streaming && !error && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center font-display text-sm italic text-background/70">
             {starting ? (
-              <div>Starting camera&hellip;</div>
+              <>
+                <div>Starting camera&hellip;</div>
+                <div className="text-xs text-background/60">
+                  If the prompt does not appear, reload and try again.
+                </div>
+              </>
             ) : (
               <>
                 <div>Tap to allow camera access.</div>

@@ -29,13 +29,14 @@
 <div id="vid-wrap">
   <video id="vid" autoplay playsinline muted></video>
   <canvas id="snap" hidden></canvas>
-  <div id="status">Starting camera…</div>
+  <div id="status">Tap Start camera to begin.</div>
 </div>
 
 <div id="log"></div>
 <div id="err" hidden></div>
 
-<div id="btn-wrap">
+<div id="btn-wrap" class="flex flex-col gap-3">
+  <button id="start-btn">Start camera</button>
   <button id="btn" disabled>Capture</button>
 </div>
 
@@ -67,27 +68,48 @@
     return;
   }
 
-  log('boot: calling getUserMedia');
-  navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false})
-    .then(function(stream){
-      log('boot: got stream');
-      vid.srcObject = stream;
-      vid.onloadedmetadata = function(){
-        var p = vid.play();
-        if (p && p.catch) p.catch(function(){});
-        statusEl.style.display = 'none';
-        btn.disabled = false;
-        log('ready');
-      };
-    })
-    .catch(function(e){
-      log('ERROR ' + e.name + ': ' + e.message);
-      var hint = '';
-      if (e.name === 'NotAllowedError') {
-        hint = ' — open Safari settings (the AA icon in the address bar) → Website Settings → Camera → Allow, then reload.';
-      }
-      showError(e.name + ': ' + e.message + hint);
-    });
+  function setStatus(text){
+    statusEl.textContent = text;
+    statusEl.style.display = 'flex';
+  }
+
+  function setError(text){
+    errEl.textContent = text;
+    errEl.hidden = false;
+    statusEl.style.display = 'none';
+    startBtn.disabled = false;
+  }
+
+  function startCamera(){
+    errEl.hidden = true;
+    startBtn.disabled = true;
+    setStatus('Starting camera…');
+    log('boot: calling getUserMedia');
+    navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false})
+      .then(function(stream){
+        log('boot: got stream');
+        vid.srcObject = stream;
+        vid.onloadedmetadata = function(){
+          var p = vid.play();
+          if (p && p.catch) p.catch(function(){});
+          statusEl.style.display = 'none';
+          startBtn.hidden = true;
+          btn.disabled = false;
+          log('ready');
+        };
+      })
+      .catch(function(e){
+        log('ERROR ' + e.name + ': ' + e.message);
+        var hint = '';
+        if (e.name === 'NotAllowedError') {
+          hint = ' — open Safari settings (the AA icon in the address bar) → Website Settings → Camera → Allow, then reload.';
+        }
+        setError(e.name + ': ' + e.message + hint);
+      });
+  }
+
+  var startBtn = document.getElementById('start-btn');
+  startBtn.addEventListener('click', startCamera);
 
   btn.addEventListener('click', function(){
     if (!vid.videoWidth) { log('capture: video not ready'); return; }
