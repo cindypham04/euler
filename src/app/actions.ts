@@ -1,14 +1,12 @@
 "use server";
 
-import { writeFile, rm } from "node:fs/promises";
-import path from "node:path";
 import { ObjectId } from "mongodb";
 import { revalidatePath } from "next/cache";
 import { GoogleGenAI } from "@google/genai";
 import {
   createProblem,
   deleteProblem as deleteProblemFromDb,
-  uploadDir,
+  saveProblemFile,
   type Message,
 } from "@/lib/problems";
 
@@ -116,19 +114,19 @@ export async function submitProblem(
   }
 
   const id = new ObjectId();
-  const relativePath = path.posix.join(
-    "data",
-    "uploads",
-    `${id.toHexString()}.${ext}`,
-  );
-  const absolutePath = path.join(await uploadDir(), `${id.toHexString()}.${ext}`);
 
+  let fileId: ObjectId;
   try {
-    await writeFile(absolutePath, bytes);
+    fileId = await saveProblemFile({
+      problemId: id,
+      filename: file.name,
+      mimeType: file.type,
+      bytes,
+    });
   } catch (err) {
     return {
       ok: false,
-      error: `Failed to write upload to disk: ${err instanceof Error ? err.message : String(err)}`,
+      error: `Failed to save upload to MongoDB: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
 
@@ -140,7 +138,7 @@ export async function submitProblem(
       filename: file.name,
       mimeType: file.type,
       size: file.size,
-      path: relativePath,
+      fileId,
       createdAt: now,
     },
     {
@@ -164,8 +162,6 @@ export async function submitProblem(
   try {
     await createProblem(id, file.name, messages);
   } catch (err) {
-    // Clean up the orphan file so we don't leak disk space on a failed insert.
-    await rm(absolutePath, { force: true });
     return {
       ok: false,
       error: `Failed to save problem: ${err instanceof Error ? err.message : String(err)}`,
