@@ -1,26 +1,22 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { NextResponse } from "next/server";
-import { getFirstFileMessage } from "@/lib/problems";
+import { getFirstFileMessage, getProblemFile } from "@/lib/problems";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const file = await getFirstFileMessage(id);
-  if (!file) {
+  const message = await getFirstFileMessage(id);
+  if (!message) {
     return new NextResponse("Not found", { status: 404 });
   }
 
-  const absolutePath = path.join(process.cwd(), file.path);
-  let bytes: Buffer;
-  try {
-    bytes = await readFile(absolutePath);
-  } catch {
-    return new NextResponse("File missing on disk", { status: 410 });
+  const file = await getProblemFile(message.fileId.toHexString());
+  if (!file) {
+    return new NextResponse("File missing", { status: 410 });
   }
 
+  const bytes = file.data.buffer;
   return new NextResponse(new Uint8Array(bytes), {
     status: 200,
     headers: {

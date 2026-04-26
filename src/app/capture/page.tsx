@@ -18,26 +18,49 @@ export default async function CapturePage() {
       type: "svg",
       margin: 1,
       width: 320,
-      color: { dark: "#000000", light: "#ffffff" },
+      color: { dark: "#1a1422", light: "#fbf6ec" },
     });
     return (
-      <main className="flex min-h-[80vh] flex-col items-center justify-center gap-6 p-8 text-center">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold">Capture from your phone</h1>
-          <p className="text-sm text-muted-foreground">
-            Scan this with your phone camera, then allow camera access on the
-            page that opens.
+      <main className="bg-graph relative flex min-h-[100dvh] flex-col items-center justify-center gap-8 p-8 text-center">
+        <div className="anim-fade-up max-w-md space-y-2">
+          <div className="editorial-label">Plate II · Capture</div>
+          <h1
+            className="font-display text-3xl leading-tight tracking-tight sm:text-4xl"
+            style={{ fontVariationSettings: "'opsz' 96, 'SOFT' 30" }}
+          >
+            <span className="italic">Capture</span> from your phone.
+          </h1>
+          <p
+            className="font-display text-base italic text-muted-foreground"
+            style={{ fontVariationSettings: "'opsz' 24" }}
+          >
+            Scan with the phone camera, then permit camera access on the page
+            that opens.
           </p>
         </div>
+
         <div
-          className="rounded-lg border bg-white p-4"
+          className="crop-marks anim-fade-up rounded border border-border bg-card p-5 shadow-sm"
+          style={{ animationDelay: "100ms" }}
           dangerouslySetInnerHTML={{ __html: svg }}
         />
-        <code className="max-w-full break-all text-xs text-muted-foreground">
-          {captureUrl}
-        </code>
-        <p className="text-xs text-muted-foreground">
-          Tunnel only stays alive while <code>npm run dev:phone</code> is
+
+        <div
+          className="anim-fade-up max-w-full space-y-1"
+          style={{ animationDelay: "200ms" }}
+        >
+          <div className="editorial-label">Address</div>
+          <code className="block max-w-full break-all font-mono text-xs text-foreground/80">
+            {captureUrl}
+          </code>
+        </div>
+
+        <p
+          className="anim-fade-up max-w-md font-display text-xs italic text-muted-foreground"
+          style={{ animationDelay: "260ms" }}
+        >
+          Tunnel only stays alive while{" "}
+          <code className="font-mono not-italic">npm run dev:phone</code> is
           running.
         </p>
       </main>

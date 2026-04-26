@@ -1,22 +1,32 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
+});
+
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  display: "swap",
+  style: ["normal", "italic"],
+  axes: ["opsz", "SOFT"],
 });
 
 export const metadata: Metadata = {
-  title: "unblind",
+  title: "unblind — a reader for math problems",
   description:
-    "Extract a math problem statement from an image and get a response.",
+    "Upload a photograph of a math problem. unblind extracts the statement, walks you through it, and answers your follow-ups.",
 };
 
 export default function RootLayout({
@@ -27,9 +37,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
     >
-      <body className="min-h-full">
+      <body className="min-h-full bg-paper">
         <TooltipProvider>{children}</TooltipProvider>
       </body>
     </html>

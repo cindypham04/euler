@@ -17,32 +17,34 @@ export function Markdown({
   return (
     <div
       className={cn(
-        "text-sm leading-relaxed",
-        // Headings
-        "[&_h1]:mt-4 [&_h1]:mb-2 [&_h1]:text-xl [&_h1]:font-semibold",
-        "[&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-semibold",
-        "[&_h3]:mt-3 [&_h3]:mb-1 [&_h3]:text-base [&_h3]:font-semibold",
+        "text-[0.95rem] leading-relaxed",
+        // Headings — display serif for textbook feel
+        "[&_h1]:mt-5 [&_h1]:mb-2 [&_h1]:font-display [&_h1]:text-2xl [&_h1]:font-semibold [&_h1]:tracking-tight",
+        "[&_h2]:mt-5 [&_h2]:mb-2 [&_h2]:font-display [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:tracking-tight",
+        "[&_h3]:mt-4 [&_h3]:mb-1.5 [&_h3]:font-display [&_h3]:text-lg [&_h3]:font-medium [&_h3]:italic",
         // Paragraphs and inline elements
-        "[&_p]:my-2 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0",
+        "[&_p]:my-3 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0",
         "[&_strong]:font-semibold",
-        "[&_em]:italic",
-        "[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2",
+        "[&_em]:italic [&_em]:font-display",
+        "[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-primary/40 hover:[&_a]:decoration-primary",
         // Lists
-        "[&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-6",
-        "[&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-6",
+        "[&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:marker:text-primary/60",
+        "[&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:marker:font-display [&_ol]:marker:italic [&_ol]:marker:text-primary/70",
         "[&_li]:my-1",
         // Code
         "[&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.85em]",
-        "[&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3",
+        "[&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:border [&_pre]:border-border [&_pre]:bg-muted/60 [&_pre]:p-3",
         "[&_pre_code]:bg-transparent [&_pre_code]:p-0",
-        // Blockquotes
-        "[&_blockquote]:my-2 [&_blockquote]:border-l-4 [&_blockquote]:border-muted [&_blockquote]:pl-3 [&_blockquote]:italic",
+        // Blockquotes — textbook callout
+        "[&_blockquote]:my-4 [&_blockquote]:border-l-2 [&_blockquote]:border-primary [&_blockquote]:bg-primary/5 [&_blockquote]:py-1 [&_blockquote]:pl-4 [&_blockquote]:font-display [&_blockquote]:italic [&_blockquote]:text-foreground/85",
         // Tables
-        "[&_table]:my-3 [&_table]:w-full [&_table]:border-collapse",
-        "[&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:font-semibold",
-        "[&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1",
+        "[&_table]:my-4 [&_table]:w-full [&_table]:border-collapse [&_table]:text-sm",
+        "[&_th]:border-b [&_th]:border-foreground/30 [&_th]:px-2 [&_th]:py-2 [&_th]:text-left [&_th]:font-display [&_th]:font-medium [&_th]:italic",
+        "[&_td]:border-b [&_td]:border-border [&_td]:px-2 [&_td]:py-1.5",
         // KaTeX display math: allow horizontal scroll on overflow
-        "[&_.katex-display]:my-2 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden",
+        "[&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden",
+        // Horizontal rule
+        "[&_hr]:my-6 [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-foreground/15",
         className,
       )}
     >

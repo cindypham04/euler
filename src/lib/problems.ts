@@ -1,9 +1,8 @@
-import { mkdir, rm } from "node:fs/promises";
-import path from "node:path";
-import { ObjectId } from "mongodb";
+import { ObjectId, Binary } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 
 const COLLECTION = "problems";
+const FILES_COLLECTION = "problem_files";
 
 export type Role = "user" | "assistant" | "system";
 
@@ -13,7 +12,7 @@ export type FileMessage = {
   filename: string;
   mimeType: string;
   size: number;
-  path: string;
+  fileId: ObjectId;
   createdAt: Date;
 };
 
@@ -38,15 +37,55 @@ export type Problem = {
 
 export type ProblemSummary = Pick<Problem, "_id" | "title" | "createdAt">;
 
+export type ProblemFile = {
+  _id: ObjectId;
+  problemId: ObjectId;
+  filename: string;
+  mimeType: string;
+  size: number;
+  data: Binary;
+  createdAt: Date;
+};
+
 async function collection() {
   const db = await getDb();
   return db.collection<Problem>(COLLECTION);
 }
 
-export async function uploadDir(): Promise<string> {
-  const dir = path.join(process.cwd(), "data", "uploads");
-  await mkdir(dir, { recursive: true });
-  return dir;
+async function filesCollection() {
+  const db = await getDb();
+  const col = db.collection<ProblemFile>(FILES_COLLECTION);
+  // Idempotent index for cleanup-by-problem.
+  await col.createIndex({ problemId: 1 });
+  return col;
+}
+
+export async function saveProblemFile(input: {
+  problemId: ObjectId;
+  filename: string;
+  mimeType: string;
+  bytes: Buffer;
+}): Promise<ObjectId> {
+  const col = await filesCollection();
+  const id = new ObjectId();
+  await col.insertOne({
+    _id: id,
+    problemId: input.problemId,
+    filename: input.filename,
+    mimeType: input.mimeType,
+    size: input.bytes.byteLength,
+    data: new Binary(input.bytes),
+    createdAt: new Date(),
+  });
+  return id;
+}
+
+export async function getProblemFile(
+  fileId: string,
+): Promise<ProblemFile | null> {
+  if (!ObjectId.isValid(fileId)) return null;
+  const col = await filesCollection();
+  return col.findOne({ _id: new ObjectId(fileId) });
 }
 
 export async function createProblem(
@@ -85,26 +124,6 @@ export async function listProblems(): Promise<ProblemSummary[]> {
   }));
 }
 
-export async function deleteProblem(id: string): Promise<boolean> {
-  if (!ObjectId.isValid(id)) return false;
-  const col = await collection();
-  const doc = await col.findOne(
-    { _id: new ObjectId(id) },
-    { projection: { messages: 1 } },
-  );
-  if (!doc) return false;
-
-  for (const msg of doc.messages) {
-    if (msg.type === "file") {
-      const abs = path.join(process.cwd(), msg.path);
-      await rm(abs, { force: true });
-    }
-  }
-
-  const result = await col.deleteOne({ _id: new ObjectId(id) });
-  return result.deletedCount === 1;
-}
-
 export async function appendMessages(
   id: string,
   messages: Message[],
@@ -120,6 +139,20 @@ export async function appendMessages(
     },
   );
   return result.matchedCount === 1;
+}
+
+export async function deleteProblem(id: string): Promise<boolean> {
+  if (!ObjectId.isValid(id)) return false;
+  const objectId = new ObjectId(id);
+  const col = await collection();
+  const doc = await col.findOne({ _id: objectId }, { projection: { _id: 1 } });
+  if (!doc) return false;
+
+  const files = await filesCollection();
+  await files.deleteMany({ problemId: objectId });
+
+  const result = await col.deleteOne({ _id: objectId });
+  return result.deletedCount === 1;
 }
 
 export async function getFirstFileMessage(

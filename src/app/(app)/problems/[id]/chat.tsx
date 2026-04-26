@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Markdown } from "@/components/markdown";
+import { cn } from "@/lib/utils";
 import type { TextMessage } from "@/lib/problems";
 
 type ChatProps = {
@@ -36,14 +37,17 @@ function safeParse<T>(content: string): T | null {
 function ToolCallCard({ message }: { message: TextMessage }) {
   const parsed = safeParse<ParsedToolCall>(message.content);
   return (
-    <Card className="border-dashed">
+    <Card className="border-dashed bg-transparent ring-0">
       <CardHeader>
-        <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">
-          Tool call: {parsed?.name ?? "unknown"}
+        <CardTitle className="editorial-label">
+          Tool call &middot;{" "}
+          <span className="font-display normal-case tracking-normal italic text-foreground/80">
+            {parsed?.name ?? "unknown"}
+          </span>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <pre className="overflow-x-auto text-xs">
+        <pre className="overflow-x-auto rounded bg-muted/60 p-2 font-mono text-[0.7rem] leading-relaxed">
           {JSON.stringify(parsed?.args ?? {}, null, 2)}
         </pre>
       </CardContent>
@@ -54,24 +58,30 @@ function ToolCallCard({ message }: { message: TextMessage }) {
 function ToolResultCard({ message }: { message: TextMessage }) {
   const parsed = safeParse<ParsedToolHit[]>(message.content) ?? [];
   return (
-    <Card className="border-dashed">
+    <Card className="border-dashed bg-transparent ring-0">
       <CardHeader>
-        <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">
-          Tool result ({parsed.length} hits)
+        <CardTitle className="editorial-label">
+          Tool result &middot;{" "}
+          <span className="font-display normal-case tracking-normal italic text-foreground/80">
+            {parsed.length} hits
+          </span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
         {parsed.map((hit, i) => (
-          <div key={i} className="text-xs">
-            <div className="font-medium">
-              {hit.section ?? "?"} (p.{hit.page ?? "?"})
+          <div key={i} className="border-l-2 border-foreground/15 pl-3 text-xs">
+            <div className="font-display italic">
+              {hit.section ?? "?"} <span className="not-italic">·</span> p.
+              {hit.page ?? "?"}
               {typeof hit.score === "number" && (
-                <span className="ml-2 text-muted-foreground">
+                <span className="ml-2 text-muted-foreground not-italic">
                   score {hit.score.toFixed(3)}
                 </span>
               )}
             </div>
-            <p className="text-muted-foreground">{hit.snippet}</p>
+            <p className="mt-1 leading-relaxed text-muted-foreground">
+              {hit.snippet}
+            </p>
           </div>
         ))}
       </CardContent>
@@ -80,18 +90,28 @@ function ToolResultCard({ message }: { message: TextMessage }) {
 }
 
 function MessageCard({ message }: { message: TextMessage }) {
+  const isUser = message.role === "user";
   const title =
     message.kind === "extraction"
       ? "Problem statement"
       : message.kind === "response"
         ? "Initial response"
-        : message.role === "user"
+        : isUser
           ? "You"
           : "Assistant";
   return (
-    <Card>
+    <Card
+      className={cn(
+        "ring-0",
+        isUser
+          ? "border-l-2 border-l-foreground/30 bg-secondary/40"
+          : "border-l-2 border-l-primary",
+      )}
+    >
       <CardHeader>
-        <CardTitle className="capitalize">{title}</CardTitle>
+        <CardTitle className="editorial-rule editorial-label">
+          {title}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <Markdown>{message.content}</Markdown>
@@ -393,17 +413,22 @@ export function Chat({ problemId, initialMessages }: ChatProps) {
       </div>
 
       {visibleMessages.map((m, i) => (
-        <div key={i} className="space-y-3">
+        <div
+          key={i}
+          className="anim-fade-up space-y-3"
+          style={{ animationDelay: `${Math.min(i, 5) * 60}ms` }}
+        >
           <MessageCard message={m} />
           {traceGroups
             .filter((g) => g.afterIndex === i)
             .map((g, gi) => (
               <details
                 key={gi}
-                className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-sm"
+                className="ml-6 border-l border-dashed border-foreground/25 pl-4"
               >
-                <summary className="cursor-pointer text-muted-foreground">
-                  Show retrieval trace ({g.messages.length} steps)
+                <summary className="cursor-pointer font-display text-sm italic text-muted-foreground transition-colors hover:text-foreground">
+                  marginalia &middot; show retrieval trace ({g.messages.length}{" "}
+                  steps)
                 </summary>
                 <div className="mt-3 space-y-2">
                   {g.messages.map((tm, ti) =>
@@ -424,10 +449,11 @@ export function Chat({ problemId, initialMessages }: ChatProps) {
         .map((g, gi) => (
           <details
             key={`pre-${gi}`}
-            className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-sm"
+            className="ml-6 border-l border-dashed border-foreground/25 pl-4"
           >
-            <summary className="cursor-pointer text-muted-foreground">
-              Show retrieval trace ({g.messages.length} steps)
+            <summary className="cursor-pointer font-display text-sm italic text-muted-foreground transition-colors hover:text-foreground">
+              marginalia &middot; show retrieval trace ({g.messages.length}{" "}
+              steps)
             </summary>
             <div className="mt-3 space-y-2">
               {g.messages.map((tm, ti) =>
@@ -441,15 +467,17 @@ export function Chat({ problemId, initialMessages }: ChatProps) {
           </details>
         ))}
 
-      <form ref={formRef} onSubmit={handleSubmit} className="space-y-3">
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-3 pt-4">
+        <div className="editorial-label">Ask a follow-up</div>
         <textarea
           value={listening && interimTranscript ? input + (input ? " " : "") + interimTranscript : input}
           onChange={(e) => { setInput(e.target.value); inputRef.current = e.target.value; }}
           onKeyDown={handleKeyDown}
           disabled={pending}
           rows={3}
-          placeholder="Ask a follow-up about this problem…"
-          className="block w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+          placeholder="What confused you about this step?"
+          className="block w-full resize-none border-0 border-b-2 border-foreground/20 bg-transparent py-2 font-display text-base italic placeholder:italic placeholder:text-muted-foreground focus:border-primary focus:outline-none disabled:opacity-50"
+          style={{ fontVariationSettings: "'opsz' 24" }}
         />
 
         {/* Mic panel */}
@@ -523,16 +551,28 @@ export function Chat({ problemId, initialMessages }: ChatProps) {
           >
             {listening ? "Stop" : "Speak"}
           </Button>
-          <Button type="submit" disabled={pending || input.trim().length === 0}>
-            {pending ? "Thinking…" : "Send"}
+          <Button
+            type="submit"
+            disabled={pending || input.trim().length === 0}
+            className="font-display"
+          >
+            {pending ? (
+              <span className="italic">Thinking&hellip;</span>
+            ) : (
+              <span className="inline-flex items-center gap-2">
+                Send <span aria-hidden>&rarr;</span>
+              </span>
+            )}
           </Button>
         </div>
       </form>
 
       {error && (
-        <Card className="border-destructive">
+        <Card className="border-l-4 border-l-destructive ring-0">
           <CardHeader>
-            <CardTitle>Error</CardTitle>
+            <CardTitle className="font-display italic">
+              Something went sideways
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="whitespace-pre-wrap text-sm text-destructive">

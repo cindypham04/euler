@@ -109,9 +109,11 @@ export function CaptureClient() {
   const buttonLabel = pending ? "Uploading…" : "Capture";
 
   return (
-    <main className="fixed inset-0 flex flex-col bg-black text-white">
-      <header className="px-4 py-2">
-        <h1 className="text-sm font-semibold">Capture problem</h1>
+    <main className="fixed inset-0 flex flex-col bg-foreground text-background">
+      <header className="px-4 py-3">
+        <h1 className="font-display text-base italic tracking-tight">
+          Capture problem
+        </h1>
       </header>
 
       <div className="relative flex-1 overflow-hidden">
@@ -124,19 +126,19 @@ export function CaptureClient() {
         />
         <canvas ref={canvasRef} className="hidden" />
         {!streaming && !error && (
-          <div className="absolute inset-0 flex items-center justify-center text-sm text-white/70">
-            Starting camera…
+          <div className="absolute inset-0 flex items-center justify-center font-display text-sm italic text-background/70">
+            Starting camera&hellip;
           </div>
         )}
         {pending && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-sm">
-            Recognizing…
+          <div className="absolute inset-0 flex items-center justify-center bg-foreground/70 font-display text-sm italic">
+            Recognizing&hellip;
           </div>
         )}
       </div>
 
       {debug.length > 0 && (
-        <div className="max-h-24 overflow-y-auto bg-black/80 px-2 py-1 font-mono text-[10px] leading-tight text-white/80">
+        <div className="max-h-24 overflow-y-auto bg-foreground/90 px-2 py-1 font-mono text-[10px] leading-tight text-background/80">
           {debug.slice(-8).map((l, i) => (
             <div key={i}>{l}</div>
           ))}
@@ -144,7 +146,9 @@ export function CaptureClient() {
       )}
 
       {error && (
-        <div className="bg-red-950 px-4 py-2 text-sm text-red-200">{error}</div>
+        <div className="border-l-4 border-l-primary bg-primary/15 px-4 py-2 font-display text-sm italic text-background">
+          {error}
+        </div>
       )}
 
       <div
@@ -155,7 +159,7 @@ export function CaptureClient() {
           type="button"
           onClick={handleCapture}
           disabled={buttonDisabled}
-          className="min-h-14 min-w-56 rounded-lg bg-white px-6 text-lg font-semibold text-black active:bg-white/80 disabled:opacity-50"
+          className="min-h-14 min-w-56 rounded-lg bg-primary px-6 font-display text-lg italic text-primary-foreground transition-transform active:translate-y-px active:bg-primary/90 disabled:opacity-50"
         >
           {buttonLabel}
         </button>
