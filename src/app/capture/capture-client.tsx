@@ -136,8 +136,15 @@ export function CaptureClient() {
               <>
                 <div>Starting camera&hellip;</div>
                 <div className="text-xs text-background/60">
-                  If the prompt does not appear, reload and try again.
+                  If the prompt does not appear, tap Retry below.
                 </div>
+                <button
+                  type="button"
+                  onClick={() => void startCamera()}
+                  className="min-h-14 min-w-56 rounded-lg border border-border bg-background/90 px-6 py-3 font-display text-sm italic text-foreground transition hover:bg-background/95"
+                >
+                  Retry camera
+                </button>
               </>
             ) : (
               <>
